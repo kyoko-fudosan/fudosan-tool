@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>売却タイミング計算ツール</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Shippori+Mincho:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f2f4f3;
+    --surface: #fff;
+    --primary: #1c3d2e;
+    --accent: #4a9e72;
+    --warn: #c0392b;
+    --warn-bg: #fff5f5;
+    --ok: #2d6a4f;
+    --ok-bg: #f0faf5;
+    --ok-border: #b7e4c7;
+    --caution: #d4870a;
+    --caution-bg: #fffbf0;
+    --text: #1a1a1a;
+    --muted: #888;
+    --border: #e0e5e2;
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans JP', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .header { background: var(--primary); padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .header-left h1 { font-family: 'Shippori Mincho', serif; font-size: 16px; color: white; font-weight: 600; }
+  .header-left p { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 3px; }
+  .header-badge { background: var(--accent); color: white; font-size: 10px; font-weight: 700; padding: 5px 12px; border-radius: 6px; letter-spacing: 1px; white-space: nowrap; }
+
+  .container { max-width: 800px; margin: 0 auto; padding: 28px 20px 80px; }
+  .sec-title { font-size: 11px; letter-spacing: 2.5px; color: var(--accent); font-weight: 700; margin-bottom: 14px; }
+
+  /* INPUT */
+  .input-card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); padding: 22px 20px; margin-bottom: 14px; }
+  .input-card-title { font-size: 14px; font-weight: 700; color: var(--primary); margin-bottom: 16px; }
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media(max-width:520px){ .field-grid { grid-template-columns: 1fr; } }
+  .field label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 5px; font-weight: 500; }
+  .field-wrap { position: relative; }
+  .field input { width: 100%; border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 11px 44px 11px 14px; font-family: 'Noto Sans JP', sans-serif; font-size: 15px; font-weight: 700; color: var(--text); outline: none; transition: border 0.2s; background: var(--bg); }
+  .field input:focus { border-color: var(--accent); background: white; }
+  .field-unit { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--muted); pointer-events: none; }
+  .field-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .dep-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; }
+  .dep-btn { background: var(--bg); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 10px 4px; font-family: 'Noto Sans JP', sans-serif; font-size: 12px; font-weight: 500; color: var(--text); cursor: pointer; text-align: center; transition: all 0.15s; }
+  .dep-btn:hover { border-color: var(--accent); }
+  .dep-btn.sel { border-color: var(--primary); background: #e0f2ea; color: var(--primary); font-weight: 700; }
+
+  /* 期間選択 */
+  .period-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; }
+  .period-btn { background: var(--bg); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 12px 4px; font-family: 'Noto Sans JP', sans-serif; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; text-align: center; transition: all 0.15s; }
+  .period-btn:hover { border-color: var(--accent); }
+  .period-btn.sel { border-color: var(--primary); background: #e0f2ea; color: var(--primary); font-weight: 700; }
+
+  .btn-calc { width: 100%; background: var(--primary); color: white; border: none; border-radius: var(--radius-sm); padding: 16px; font-family: 'Noto Sans JP', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-top: 4px; letter-spacing: 0.5px; }
+  .btn-calc:hover { background: #0f2218; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(28,61,46,0.25); }
+
+  .risk-notice { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .risk-item { display: flex; gap: 12px; background: var(--caution-bg); border: 1px solid var(--caution-border); border-radius: var(--radius-sm); padding: 13px 15px; align-items: flex-start; }
+  .risk-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+  .risk-title { font-size: 13px; font-weight: 700; color: var(--caution); margin-bottom: 4px; }
+  .risk-desc { font-size: 12px; color: #666; line-height: 1.7; }
+
+  /* RESULT */
+  #result { display: none; animation: up 0.3s ease; margin-top: 28px; }
+  @keyframes up { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+
+  /* ===== 2択対比 ===== */
+  .vs-wrap { display: grid; grid-template-columns: 1fr auto 1fr; gap: 0; margin-bottom: 16px; align-items: center; }
+  @media(max-width:480px){ .vs-wrap { grid-template-columns:1fr; } }
+  .vs-card { border-radius: var(--radius); padding: 22px 18px; }
+  .vs-card.now-card { background: var(--ok-bg); border: 2.5px solid var(--accent); }
+  .vs-card.wait-card { border: 2.5px solid #e8a0a0; }
+  .vs-divider { display: flex; align-items: center; justify-content: center; padding: 0 10px; }
+  .vs-circle { width: 40px; height: 40px; border-radius: 50%; background: var(--primary); color: white; font-size: 12px; font-weight: 900; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .vs-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; margin-bottom: 10px; }
+  .now-card .vs-label { color: var(--ok); }
+  .vs-main-num { font-family: 'Shippori Mincho', serif; font-size: 26px; font-weight: 700; line-height: 1.2; margin-bottom: 4px; }
+  .now-card .vs-main-num { color: var(--ok); }
+  .vs-main-label { font-size: 11px; color: var(--muted); margin-bottom: 14px; }
+  .vs-rows { display: flex; flex-direction: column; gap: 5px; }
+  .vs-row { display: flex; justify-content: space-between; font-size: 12px; padding: 5px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
+  .vs-row:last-child { border: none; }
+  .vs-row-label { color: var(--muted); }
+  .vs-row-val { font-weight: 700; }
+
+  /* 差額バナー */
+  .diff-banner { border-radius: var(--radius); padding: 18px 22px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  @media(max-width:480px){ .diff-banner { flex-direction:column; text-align:center; } }
+  .diff-banner-left .diff-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .diff-banner-left .diff-num { font-family: 'Shippori Mincho', serif; font-size: 32px; font-weight: 700; }
+  .diff-banner-right { font-size: 13px; line-height: 1.8; }
+
+  /* ===== 3パターン比較 ===== */
+  .patterns-title { font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 12px; }
+  .patterns-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 20px; }
+  @media(max-width:480px){ .patterns-grid { grid-template-columns:1fr; } }
+  .p-card { border-radius: var(--radius-sm); padding: 16px 14px; border: 1.5px solid transparent; }
+  .p-label { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .p-net { font-family: 'Shippori Mincho', serif; font-size: 18px; font-weight: 700; margin-bottom: 2px; }
+  .p-net-label { font-size: 10px; color: var(--muted); margin-bottom: 10px; }
+  .p-loss { font-size: 12px; font-weight: 700; padding: 6px 0; border-top: 1px solid rgba(0,0,0,0.07); }
+  .p-loss-label { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+  .p-rows { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+  .p-row { display: flex; justify-content: space-between; font-size: 11px; }
+  .p-row-label { color: var(--muted); }
+
+  /* 損失棒グラフ */
+  .loss-chart { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); padding: 20px; margin-bottom: 20px; }
+  .loss-chart-title { font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 16px; }
+  .loss-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .loss-row:last-child { margin-bottom: 0; }
+  .loss-row-label { font-size: 12px; color: var(--muted); width: 80px; flex-shrink: 0; }
+  .loss-track-wrap { flex: 1; }
+  .loss-track { height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden; }
+  .loss-fill { height: 100%; border-radius: 5px; transition: width 0.8s ease; }
+  .loss-val { font-size: 12px; font-weight: 700; width: 80px; text-align: right; flex-shrink: 0; }
+
+  /* トーク */
+  .talk-card { background: var(--primary); border-radius: var(--radius); padding: 22px 20px; margin-bottom: 16px; }
+  .talk-card .sec-title { color: rgba(255,255,255,0.55); }
+  .talk-item { background: rgba(255,255,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 13px 16px; margin-bottom: 10px; font-size: 13px; line-height: 1.8; color: rgba(255,255,255,0.92); }
+  .talk-item:last-child { margin-bottom: 0; }
+  .talk-lbl { font-size: 10px; color: var(--accent); font-weight: 700; margin-bottom: 5px; letter-spacing: 1px; }
+
+  .btn-reset { background: none; border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 11px 24px; font-family: 'Noto Sans JP', sans-serif; font-size: 13px; color: var(--muted); cursor: pointer; }
+
+  .divider { height: 1px; background: var(--border); margin: 24px 0; }
+
+  /* タブ */
+  .tabs { display: flex; margin-bottom: 24px; background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+  .tab-btn { flex: 1; background: none; border: none; border-right: 1px solid var(--border); padding: 14px 8px; font-family: "Noto Sans JP", sans-serif; font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; transition: all 0.15s; line-height: 1.4; }
+  .tab-btn:last-child { border-right: none; }
+  .tab-btn.active { background: var(--primary); color: white; font-weight: 700; }
+  .tab-btn:hover:not(.active) { background: var(--bg); color: var(--text); }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+  .sim-hint { font-size: 12px; color: var(--muted); line-height: 1.7; margin-bottom: 16px; }
+  .sim-row { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+  .sim-row-num { font-size: 12px; color: var(--muted); width: 18px; flex-shrink: 0; text-align: center; }
+  .sim-price-input { flex: 1; border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; font-family: "Noto Sans JP", sans-serif; font-size: 15px; font-weight: 700; color: var(--text); outline: none; background: var(--bg); transition: border 0.2s; }
+  .sim-price-input:focus { border-color: var(--accent); background: white; }
+  .sim-price-unit { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+  .sim-period-sel { border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 10px 10px; font-family: "Noto Sans JP", sans-serif; font-size: 12px; color: var(--text); background: var(--bg); outline: none; cursor: pointer; flex-shrink: 0; }
+  .sim-remove-btn { background: none; border: 1.5px solid var(--border); border-radius: var(--radius-sm); width: 34px; height: 38px; font-size: 15px; color: var(--muted); cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+  .sim-remove-btn:hover { border-color: var(--warn); color: var(--warn); }
+  .sim-add-btn { background: none; border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 10px; font-family: "Noto Sans JP", sans-serif; font-size: 13px; color: var(--muted); cursor: pointer; width: 100%; margin-top: 6px; transition: all 0.15s; }
+  .sim-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .sim-table-wrap { overflow-x: auto; }
+  .sim-result-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 480px; }
+  .sim-result-table th { background: var(--primary); color: white; padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+  .sim-result-table th:not(:first-child) { text-align: right; }
+  .sim-result-table td { padding: 11px 12px; border-bottom: 1px solid var(--bg); }
+  .sim-result-table td:not(:first-child) { text-align: right; font-weight: 600; }
+  .sim-result-table tr.best-row td { background: var(--ok-bg); }
+  .sim-best-badge { display: inline-block; background: var(--ok); color: white; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; margin-left: 6px; }
+  .sim-net-pos { color: var(--ok); }
+  .sim-net-neg { color: var(--warn); }
+  .sim-sub { font-size: 11px; color: var(--muted); font-weight: 400; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>売却タイミング計算ツール</h1>
+    <p>タイミング比較 ＋ 売却価格シミュレーター</p>
+  </div>
+  <div class="header-badge">STAFF USE</div>
+</div>
+
+<div class="container">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('timing',this)">⏱ タイミング比較</button>
+    <button class="tab-btn" onclick="switchTab('sim',this)">💴 売却価格シミュレーター</button>
+  </div>
+
+  <div id="tab-timing" class="tab-pane active">
+  <div class="sec-title">📋 お客様の状況を入力</div>
+
+  <div class="input-card">
+    <div class="input-card-title">🏠 物件・ローン情報</div>
+    <div class="field-grid">
+      <div class="field">
+        <label>売却予定価格（万円）</label>
+        <div class="field-wrap">
+          <input type="number" id="sale-price" placeholder="3500">
+          <span class="field-unit">万円</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>ローン残債（万円）</label>
+        <div class="field-wrap">
+          <input type="number" id="loan" placeholder="2000">
+          <span class="field-unit">万円</span>
+        </div>
+        <div class="field-hint">ない場合は 0</div>
+      </div>
+      <div class="field">
+        <label>月々のローン返済額（万円）</label>
+        <div class="field-wrap">
+          <input type="number" id="monthly-loan" placeholder="10">
+          <span class="field-unit">万円</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>ローン金利（年率 %）</label>
+        <div class="field-wrap">
+          <input type="number" id="interest-rate" placeholder="1.5" step="0.1">
+          <span class="field-unit">%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="input-card">
+    <div class="input-card-title">💴 月々の維持コスト</div>
+    <div class="field-grid">
+      <div class="field">
+        <label>管理費・修繕積立金（万円/月）</label>
+        <div class="field-wrap">
+          <input type="number" id="management" placeholder="3">
+          <span class="field-unit">万円</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>固定資産税（万円/年）</label>
+        <div class="field-wrap">
+          <input type="number" id="property-tax" placeholder="12">
+          <span class="field-unit">万円/年</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>その他維持費（万円/月）</label>
+        <div class="field-wrap">
+          <input type="number" id="other-cost" placeholder="0">
+          <span class="field-unit">万円</span>
+        </div>
+        <div class="field-hint">光熱費・保険など</div>
+      </div>
+      <div class="field">
+        <label>仮住まいの家賃（万円/月）</label>
+        <div class="field-wrap">
+          <input type="number" id="rent" placeholder="0">
+          <span class="field-unit">万円</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="risk-notice">
+    <div class="risk-item">
+      <span class="risk-icon">🧠</span>
+      <div>
+        <div class="risk-title">頭の中の機会損失</div>
+        <div class="risk-desc">売却資金が手元にない間、運用・活用できない機会が失われ続けます。精神的なストレスも含め、待つことには見えないコストがあります。</div>
+      </div>
+    </div>
+    <div class="risk-item">
+      <span class="risk-icon">🏚</span>
+      <div>
+        <div class="risk-title">空き家の風化リスク</div>
+        <div class="risk-desc">空き家は人が住まないほど劣化が進みます。雨漏り・害虫・外壁の傷みなど、放置期間が長いほど修繕コストと資産価値の下落が加速します。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="input-card">
+    <div class="input-card-title">📊 売却シナリオ</div>
+    <div class="field-grid">
+      <div class="field">
+        <label>「待った場合」の期間（2択対比用）</label>
+        <div class="period-grid" id="period-choices">
+          <button class="period-btn" onclick="selPeriod(3,this)">3ヶ月</button>
+          <button class="period-btn sel" onclick="selPeriod(6,this)">6ヶ月</button>
+          <button class="period-btn" onclick="selPeriod(12,this)">12ヶ月</button>
+        </div>
+        <input type="hidden" id="period-val" value="6">
+        <div class="field-hint" style="margin-top:8px">上の2択対比で使う期間</div>
+      </div>
+      <div class="field">
+        <label>相場の値下がり（年率）</label>
+        <div class="dep-grid" id="dep-choices">
+          <button class="dep-btn sel" onclick="selDep(0,this)">なし</button>
+          <button class="dep-btn" onclick="selDep(1,this)">1%</button>
+          <button class="dep-btn" onclick="selDep(2,this)">2%</button>
+          <button class="dep-btn" onclick="selDep(3,this)">3%</button>
+          <button class="dep-btn" onclick="selDep(5,this)">5%</button>
+          <button class="dep-btn" onclick="selDep(10,this)">10%</button>
+        </div>
+        <input type="hidden" id="dep-val" value="0">
+        <div class="field-hint" style="margin-top:8px">わからない場合は「なし」でOK</div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-calc" onclick="calculate()">💡 計算する</button>
+
+  <!-- RESULT -->
+  <div id="result">
+
+    <!-- ① 2択対比 -->
+    <div class="sec-title">今すぐ売る vs 待つ</div>
+    <div class="vs-wrap">
+      <div class="vs-card now-card" id="now-card"></div>
+      <div class="vs-divider"><div class="vs-circle">VS</div></div>
+      <div class="vs-card wait-card" id="wait-card"></div>
+    </div>
+    <div class="diff-banner" id="diff-banner"></div>
+
+    <div class="divider"></div>
+
+    <!-- ② 3パターン比較 -->
+    <div class="sec-title">待つ期間別の比較</div>
+    <div class="patterns-grid" id="patterns-grid"></div>
+
+    <!-- 損失棒グラフ -->
+    <div class="loss-chart">
+      <div class="loss-chart-title">⏱ 待つほど積み上がる損失</div>
+      <div id="loss-chart-rows"></div>
+    </div>
+
+    <!-- トーク -->
+    <div class="talk-card">
+      <div class="sec-title">💬 この数字を使ったトーク</div>
+      <div id="talks"></div>
+    </div>
+
+    <button class="btn-reset" onclick="reset()">← 入力に戻る</button>
+  </div>
+  </div><!-- /tab-timing -->
+
+  <div id="tab-sim" class="tab-pane">
+    <div class="input-card">
+      <div class="input-card-title">🏠 共通情報（タイミング比較タブから自動引用）</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.8">ローン残債・維持費はタイミング比較タブの入力値をそのまま使います。<br>先にタイミング比較タブで入力してからこちらを使ってください。</div>
+    </div>
+    <div class="input-card">
+      <div class="input-card-title">💴 売却価格シナリオを入力</div>
+      <div class="sim-hint">「○ヶ月待って○○万円で売れた場合」を複数パターン追加して比較できます。</div>
+      <div id="sim-rows"></div>
+      <button class="sim-add-btn" onclick="addSimRow()">＋ パターンを追加</button>
+    </div>
+    <button class="btn-calc" onclick="calcSim()">📊 比較する</button>
+    <div id="sim-result" style="display:none;margin-top:24px">
+      <div class="sec-title">手取り比較</div>
+      <div class="input-card">
+        <div class="sim-table-wrap">
+          <table class="sim-result-table" id="sim-table"></table>
+        </div>
+      </div>
+      <div class="talk-card" id="sim-talk-card">
+        <div class="sec-title">💬 この数字を使ったトーク</div>
+        <div id="sim-talks"></div>
+      </div>
+    </div>
+  </div><!-- /tab-sim -->
+
+</div>
+
+<script>
+function fmt(n){ return Math.round(Math.abs(n)).toLocaleString(); }
+function fmtNet(n){ return n >= 0 ? fmt(n)+'万円' : '−'+fmt(n)+'万円'; }
+
+function selPeriod(val, btn){
+  document.querySelectorAll('#period-choices .period-btn').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+  document.getElementById('period-val').value = val;
+}
+function selDep(val, btn){
+  document.querySelectorAll('#dep-choices .dep-btn').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+  document.getElementById('dep-val').value = val;
+}
+function getVal(id, def=0){ return parseFloat(document.getElementById(id).value)||def; }
+
+function calcPattern(salePrice, loan, intRate, monthlyMaint, depRate, months){
+  const commission      = Math.round(salePrice * 0.033 + 6.6);
+  const monthlyInterest = loan > 0 ? loan*(intRate/12) : 0;
+  const depFactor       = Math.pow(1 - depRate/12, months);
+  const actualPrice     = Math.round(salePrice * depFactor);
+  const cumMaint        = Math.round(monthlyMaint * months);
+  const cumInterest     = Math.round(monthlyInterest * months);
+  const priceDrop       = Math.round(salePrice - actualPrice);
+  const totalLoss       = cumMaint + cumInterest + priceDrop;
+  const net             = actualPrice - commission - loan - cumMaint - cumInterest;
+  return { commission, actualPrice, cumMaint, cumInterest, priceDrop, totalLoss, net, monthlyInterest };
+}
+
+function calculate(){
+  const salePrice     = getVal('sale-price');
+  const loan          = getVal('loan');
+  const monthlyLoan   = getVal('monthly-loan');
+  const intRate       = getVal('interest-rate', 1.5) / 100;
+  const management    = getVal('management');
+  const propTax       = getVal('property-tax') / 12;
+  const otherCost     = getVal('other-cost');
+  const rent          = getVal('rent');
+  const period        = parseInt(document.getElementById('period-val').value)||6;
+  const depRate       = parseFloat(document.getElementById('dep-val').value) / 100;
+
+  if(!salePrice){ alert('売却予定価格を入力してください'); return; }
+
+  const monthlyMaint = management + propTax + otherCost + rent;
+  const monthlyTotal = monthlyMaint + (loan>0 ? loan*(intRate/12) : 0);
+
+  // 計算
+  const now  = calcPattern(salePrice, loan, intRate, monthlyMaint, depRate, 0);
+  const wait = calcPattern(salePrice, loan, intRate, monthlyMaint, depRate, period);
+  const r3   = calcPattern(salePrice, loan, intRate, monthlyMaint, depRate, 3);
+  const r6   = calcPattern(salePrice, loan, intRate, monthlyMaint, depRate, 6);
+  const r12  = calcPattern(salePrice, loan, intRate, monthlyMaint, depRate, 12);
+  const diff = now.net - wait.net;
+
+  // 今すぐカードの色（手取りがマイナスの場合は警告色）
+  const nowNetColor = now.net >= 0 ? 'var(--ok)' : 'var(--warn)';
+  const nowNetPrefix = now.net >= 0 ? '' : '−';
+
+  // ===== ① 2択対比 =====
+  document.getElementById('now-card').innerHTML=`
+    <div class="vs-label">✅ 今すぐ売る</div>
+    <div class="vs-main-num" style="color:${nowNetColor}">${nowNetPrefix}${fmt(now.net)}万円</div>
+    <div class="vs-main-label">手取り（概算）${now.net < 0 ? '<span style="color:var(--warn);font-size:10px;margin-left:4px">※ 持ち出しあり</span>' : ''}</div>
+    <div class="vs-rows">
+      <div class="vs-row"><span class="vs-row-label">売却価格</span><span class="vs-row-val">${fmt(salePrice)}万円</span></div>
+      <div class="vs-row"><span class="vs-row-label">仲介手数料</span><span class="vs-row-val" style="color:var(--warn)">−${fmt(now.commission)}万円</span></div>
+      ${loan>0?`<div class="vs-row"><span class="vs-row-label">ローン返済</span><span class="vs-row-val" style="color:var(--warn)">−${fmt(loan)}万円</span></div>`:''}
+      <div class="vs-row"><span class="vs-row-label">待機コスト</span><span class="vs-row-val" style="color:var(--ok)">±0</span></div>
+      <div class="vs-row" style="border-top:1.5px solid rgba(0,0,0,0.08);margin-top:4px;padding-top:8px">
+        <span class="vs-row-label" style="font-weight:700;color:${nowNetColor}">手取り</span>
+        <span class="vs-row-val" style="color:${nowNetColor}">${nowNetPrefix}${fmt(now.net)}万円</span>
+      </div>
+    </div>`;
+
+  const waitBg = period===3?'var(--caution-bg)':period===6?'#fff3ee':'var(--warn-bg)';
+  const waitColor = period===3?'var(--caution)':period===6?'#c05020':'var(--warn)';
+  document.getElementById('wait-card').style.background = waitBg;
+  document.getElementById('wait-card').innerHTML=`
+    <div class="vs-label" style="color:${waitColor}">⏳ ${period}ヶ月待った場合</div>
+    <div class="vs-main-num" style="color:${waitColor}">${wait.net>=0?fmt(wait.net):'−'+fmt(-wait.net)}万円</div>
+    <div class="vs-main-label">手取り（概算）</div>
+    <div class="vs-rows">
+      <div class="vs-row"><span class="vs-row-label">売却価格</span><span class="vs-row-val">${fmt(wait.actualPrice)}万円</span></div>
+      <div class="vs-row"><span class="vs-row-label">仲介手数料</span><span class="vs-row-val" style="color:var(--warn)">−${fmt(wait.commission)}万円</span></div>
+      ${loan>0?`<div class="vs-row"><span class="vs-row-label">ローン返済</span><span class="vs-row-val" style="color:var(--warn)">−${fmt(loan)}万円</span></div>`:''}
+      ${wait.cumMaint>0?`<div class="vs-row"><span class="vs-row-label">維持費累計</span><span class="vs-row-val" style="color:var(--warn)">−${fmt(wait.cumMaint)}万円</span></div>`:''}
+      ${wait.cumInterest>0?`<div class="vs-row"><span class="vs-row-label">利息累計</span><span class="vs-row-val" style="color:var(--warn)">−${fmt(wait.cumInterest)}万円</span></div>`:''}
+      ${wait.priceDrop>0?`<div class="vs-row"><span class="vs-row-label">相場下落</span><span class="vs-row-val" style="color:var(--warn)">−${fmt(wait.priceDrop)}万円</span></div>`:''}
+      <div class="vs-row" style="border-top:1.5px solid rgba(0,0,0,0.08);margin-top:4px;padding-top:8px">
+        <span class="vs-row-label" style="font-weight:700;color:${waitColor}">手取り</span>
+        <span class="vs-row-val" style="color:${waitColor}">${wait.net>=0?fmt(wait.net):'−'+fmt(-wait.net)}万円</span>
+      </div>
+    </div>`;
+
+  const isBetter = diff > 0;
+  document.getElementById('diff-banner').style.cssText = isBetter
+    ? 'background:var(--ok-bg);border:2px solid var(--ok-border)'
+    : 'background:var(--warn-bg);border:2px solid #f5c6c6';
+  document.getElementById('diff-banner').innerHTML = isBetter ? `
+    <div class="diff-banner-left">
+      <div class="diff-label">今すぐ売った方が</div>
+      <div class="diff-num" style="color:var(--ok)">+${fmt(diff)}万円 お得</div>
+    </div>
+    <div class="diff-banner-right" style="color:var(--ok)">${period}ヶ月待つと<br><strong>${fmt(wait.totalLoss)}万円</strong>のコストが積み上がります</div>
+  ` : `
+    <div class="diff-banner-left">
+      <div class="diff-label">${period}ヶ月待った方が</div>
+      <div class="diff-num" style="color:var(--caution)">+${fmt(-diff)}万円 お得（試算上）</div>
+    </div>
+    <div class="diff-banner-right" style="color:var(--muted)">ただし相場や売れ行き次第で<br>この通りにはなりません</div>
+  `;
+
+  // ===== ② 3パターン比較 =====
+  const pts = [
+    { label:'3ヶ月後', r:r3, color:'var(--caution)', bg:'var(--caution-bg)', border:'#f0c060' },
+    { label:'6ヶ月後', r:r6, color:'#c05020',        bg:'#fff3ee',          border:'#f0a080' },
+    { label:'12ヶ月後', r:r12, color:'var(--warn)',  bg:'var(--warn-bg)',   border:'#e8a0a0' },
+  ];
+
+  document.getElementById('patterns-grid').innerHTML = pts.map(p=>`
+    <div class="p-card" style="background:${p.bg};border-color:${p.border}">
+      <div class="p-label" style="color:${p.color}">${p.label}</div>
+      <div class="p-net" style="color:${p.color}">${p.r.net>=0?fmt(p.r.net):'−'+fmt(-p.r.net)}<span style="font-size:12px;font-weight:500">万円</span></div>
+      <div class="p-net-label">手取り（概算）</div>
+      <div class="p-loss">
+        <div class="p-loss-label">今すぐ比で</div>
+        <span style="color:${p.color};font-size:14px">−${fmt(now.net - p.r.net)}万円</span>
+      </div>
+      <div class="p-rows">
+        ${p.r.cumMaint>0?`<div class="p-row"><span class="p-row-label">維持費</span><span style="color:var(--warn)">−${fmt(p.r.cumMaint)}万</span></div>`:''}
+        ${p.r.cumInterest>0?`<div class="p-row"><span class="p-row-label">利息</span><span style="color:var(--warn)">−${fmt(p.r.cumInterest)}万</span></div>`:''}
+        ${p.r.priceDrop>0?`<div class="p-row"><span class="p-row-label">相場下落</span><span style="color:var(--warn)">−${fmt(p.r.priceDrop)}万</span></div>`:''}
+      </div>
+    </div>`).join('');
+
+  // 損失棒グラフ
+  const maxLoss = Math.max(r3.totalLoss, r6.totalLoss, r12.totalLoss, 1);
+  const lossItems = [
+    { label:'3ヶ月後', val:r3.totalLoss, color:'var(--caution)' },
+    { label:'6ヶ月後', val:r6.totalLoss, color:'#c05020' },
+    { label:'12ヶ月後', val:r12.totalLoss, color:'var(--warn)' },
+  ];
+  document.getElementById('loss-chart-rows').innerHTML = lossItems.map(l=>`
+    <div class="loss-row">
+      <div class="loss-row-label" style="color:${l.color}">${l.label}</div>
+      <div class="loss-track-wrap">
+        <div class="loss-track">
+          <div class="loss-fill" style="width:${l.val/maxLoss*100}%;background:${l.color}"></div>
+        </div>
+      </div>
+      <div class="loss-val" style="color:${l.color}">${l.val>0?'−'+fmt(l.val)+'万円':'±0'}</div>
+    </div>`).join('');
+
+  // ===== トーク =====
+  const talks = [];
+  talks.push({
+    l:'2択で一発見せてから3パターンに展開',
+    s:`「まず${period}ヶ月待った場合と今すぐを比べると、手取りが${fmt(diff)}万円変わります。さらに3ヶ月・6ヶ月・12ヶ月と並べると損失がどんどん積み上がっていくのがわかります」`
+  });
+  if(monthlyTotal > 0){
+    talks.push({
+      l:'月々のコストで動かす',
+      s:`「毎月${fmt(Math.round(monthlyTotal))}万円のコストが出ています。3ヶ月で${fmt(r3.totalLoss)}万円、6ヶ月で${fmt(r6.totalLoss)}万円、1年では${fmt(r12.totalLoss)}万円です。今売ればこのお金がそのまま手元に残ります」`
+    });
+  }
+  if(r12.totalLoss > 200){
+    talks.push({
+      l:'借入提案で背中を押す',
+      s:`「1年待つと${fmt(r12.totalLoss)}万円の損失です。仮に${fmt(Math.min(r3.totalLoss+50,300))}万円を短期で借りて今動いた方が、ずっと得策です」`
+    });
+  }
+  if(depRate > 0){
+    talks.push({
+      l:'相場下落を加える',
+      s:`「相場が年${depRate*100}%下がると仮定すると、12ヶ月後には${fmt(r12.priceDrop)}万円下がります。維持費と合わせると${fmt(r12.totalLoss)}万円の損失です。今が一番高く売れます」`
+    });
+  }
+
+  talks.push({
+    l:'見えないリスクも伝える',
+    s:`「数字に出にくいリスクもあります。売却資金が手元にない間の機会損失、そして空き家は人が住まないほど劣化が進み修繕コストが増えます。これらも含めると、待つほど総合的な損失は大きくなります」`
+  });
+
+  document.getElementById('talks').innerHTML = talks.map(t=>`
+    <div class="talk-item">
+      <div class="talk-lbl">${t.l}</div>${t.s}
+    </div>`).join('');
+
+  document.getElementById('result').style.display = 'block';
+  document.getElementById('result').scrollIntoView({behavior:'smooth'});
+}
+
+function reset(){
+  document.getElementById('result').style.display = 'none';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ===== タブ切替 =====
+function switchTab(id, btn){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+}
+
+// ===== 売却価格シミュレーター =====
+let simRowCount = 0;
+
+function addSimRow(price='', months=12){
+  simRowCount++;
+  const id = simRowCount;
+  const row = document.createElement('div');
+  row.className = 'sim-row';
+  row.id = 'sim-row-'+id;
+  row.innerHTML = `
+    <span class="sim-row-num">${id}</span>
+    <input type="number" class="sim-price-input" id="sim-price-${id}" placeholder="例：3800" value="${price}">
+    <span class="sim-price-unit">万円で</span>
+    <select class="sim-period-sel" id="sim-period-${id}">
+      <option value="0">今すぐ</option>
+      <option value="3">3ヶ月後</option>
+      <option value="6">6ヶ月後</option>
+      <option value="9" ${months==9?'selected':''}>9ヶ月後</option>
+      <option value="12" ${months==12?'selected':''}>12ヶ月後</option>
+      <option value="18">18ヶ月後</option>
+      <option value="24">24ヶ月後</option>
+    </select>
+    <span class="sim-price-unit">売れた場合</span>
+    <button class="sim-remove-btn" onclick="removeSimRow(${id})">×</button>`;
+  // 期間のselect default
+  row.querySelector('select').value = months;
+  document.getElementById('sim-rows').appendChild(row);
+}
+
+function removeSimRow(id){
+  const el = document.getElementById('sim-row-'+id);
+  if(el) el.remove();
+}
+
+function calcSim(){
+  const loan       = getVal('loan');
+  const intRate    = getVal('interest-rate', 1.5) / 100;
+  const management = getVal('management');
+  const propTax    = getVal('property-tax') / 12;
+  const otherCost  = getVal('other-cost');
+  const rent       = getVal('rent');
+  const monthlyMaint = management + propTax + otherCost + rent;
+
+  // 行を収集
+  const rows = [];
+  document.querySelectorAll('.sim-row').forEach(row=>{
+    const id = row.id.replace('sim-row-','');
+    const price = parseFloat(document.getElementById('sim-price-'+id).value)||0;
+    const months = parseInt(document.getElementById('sim-period-'+id).value)||0;
+    if(price > 0) rows.push({price, months});
+  });
+
+  if(rows.length === 0){ alert('売却価格を1つ以上入力してください'); return; }
+
+  // 各パターンの手取りを計算
+  const results = rows.map(r=>{
+    const commission    = Math.round(r.price * 0.033 + 6.6);
+    const monthlyInt    = loan > 0 ? loan*(intRate/12) : 0;
+    const cumMaint      = Math.round(monthlyMaint * r.months);
+    const cumInterest   = Math.round(monthlyInt * r.months);
+    const net           = r.price - commission - loan - cumMaint - cumInterest;
+    const periodLabel   = r.months===0?'今すぐ':r.months+'ヶ月後';
+    return { ...r, commission, cumMaint, cumInterest, net, periodLabel };
+  });
+
+  const bestNet = Math.max(...results.map(r=>r.net));
+
+  // テーブル生成
+  let html = `<thead><tr>
+    <th>シナリオ</th>
+    <th>売却価格</th>
+    <th>仲介手数料</th>
+    ${loan>0?'<th>ローン返済</th>':''}
+    ${monthlyMaint>0?'<th>維持費・利息累計</th>':''}
+    <th>手取り（概算）</th>
+  </tr></thead><tbody>`;
+
+  results.forEach((r,i)=>{
+    const isBest = r.net === bestNet;
+    const netClass = r.net >= 0 ? 'sim-net-pos' : 'sim-net-neg';
+    html += `<tr class="${isBest?'best-row':''}">
+      <td>${r.periodLabel}に${fmt(r.price)}万円で売却${isBest?'<span class="sim-best-badge">最もお得</span>':''}</td>
+      <td>${fmt(r.price)}万円</td>
+      <td class="sim-net-neg">−${fmt(r.commission)}万円</td>
+      ${loan>0?`<td class="sim-net-neg">−${fmt(loan)}万円</td>`:''}
+      ${monthlyMaint>0?`<td class="sim-net-neg">−${fmt(r.cumMaint+r.cumInterest)}万円</td>`:''}
+      <td class="${r.net>=0?'sim-net-pos':'sim-net-neg'}" style="font-size:15px">${fmtNet(r.net)}</td>
+    </tr>`;
+  });
+  html += '</tbody>';
+  document.getElementById('sim-table').innerHTML = html;
+
+  // トーク生成
+  const best = results.find(r=>r.net===bestNet);
+  const worst = results.reduce((a,b)=>a.net<b.net?a:b);
+  const talkHTML = [];
+
+  talkHTML.push(`<div class="talk-item">
+    <div class="talk-lbl">比較結果を見せる</div>
+    「${best.periodLabel}に${fmt(best.price)}万円で売れた場合が一番手取りが多く、${fmtNet(bestNet)}です。${results.length>1?'各シナリオを並べると、売却価格と期間の組み合わせでこれだけ差が出ます':''}」
+  </div>`);
+
+  if(results.length > 1){
+    const diff = bestNet - worst.net;
+    talkHTML.push(`<div class="talk-item">
+      <div class="talk-lbl">最良・最悪の差を見せる</div>
+      「一番いいシナリオと一番悪いシナリオでは手取りが${fmt(diff)}万円変わります。${fmt(diff)}万円の差は${Math.round(diff/monthlyMaint||diff/10)}ヶ月分の維持費に相当します」
+    </div>`);
+  }
+
+  document.getElementById('sim-talks').innerHTML = talkHTML.join('');
+  document.getElementById('sim-result').style.display = 'block';
+  document.getElementById('sim-result').scrollIntoView({behavior:'smooth'});
+}
+
+// 初期行を追加
+addSimRow(3800, 12);
+addSimRow(4000, 12);
+</script>
+</body>
+</html>
